@@ -1,5 +1,5 @@
 [package]
-name = "port-cli"
+name = "portui"
 version = "0.1.0"
 edition = "2021"
 description = "Interactive TUI for active listening ports and process management"

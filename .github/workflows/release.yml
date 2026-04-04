@@ -15,9 +15,9 @@ jobs:
       matrix:
         include:
           - os: macos-13
-            artifact: port-cli-darwin-x64
+            artifact: portui-darwin-x64
           - os: macos-latest
-            artifact: port-cli-darwin-arm64
+            artifact: portui-darwin-arm64
     runs-on: ${{ matrix.os }}
     steps:
       - uses: actions/checkout@v4
@@ -30,8 +30,8 @@ jobs:
       - name: Package tarball
         run: |
           mkdir -p "dist/${{ matrix.artifact }}"
-          cp target/release/port-cli "dist/${{ matrix.artifact }}/port-cli"
-          chmod +x "dist/${{ matrix.artifact }}/port-cli"
+          cp target/release/portui "dist/${{ matrix.artifact }}/portui"
+          chmod +x "dist/${{ matrix.artifact }}/portui"
           cd dist && tar czvf "${{ matrix.artifact }}.tar.gz" "${{ matrix.artifact }}"
 
       - name: Upload release asset

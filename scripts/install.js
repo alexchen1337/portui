@@ -9,7 +9,7 @@ const tar = require("tar");
 
 const root = join(__dirname, "..");
 const binDir = join(root, "bin");
-const binPath = join(binDir, "port-cli");
+const binPath = join(binDir, "portui");
 
 async function downloadRelease(url) {
   const res = await fetch(url);
@@ -26,22 +26,25 @@ async function downloadRelease(url) {
 }
 
 async function main() {
-  if (process.env.PORT_CLI_SKIP_DOWNLOAD === "1") {
+  if (
+    process.env.PORTUI_SKIP_DOWNLOAD === "1" ||
+    process.env.PORT_CLI_SKIP_DOWNLOAD === "1"
+  ) {
     return;
   }
 
-  const devBuild = join(root, "target", "release", "port-cli");
+  const devBuild = join(root, "target", "release", "portui");
   if (existsSync(devBuild)) {
     mkdirSync(binDir, { recursive: true });
     copyFileSync(devBuild, binPath);
     chmodSync(binPath, 0o755);
-    console.log("port-cli: using local build from target/release");
+    console.log("portui: using local build from target/release");
     return;
   }
 
   if (process.platform !== "darwin") {
     console.warn(
-      "port-cli: macOS only. Skipping prebuilt download. Build from source with Rust: cargo install --path ."
+      "portui: macOS only. Skipping prebuilt download. Build from source with Rust: cargo install --path ."
     );
     return;
   }
@@ -49,11 +52,11 @@ async function main() {
   const arch =
     process.arch === "arm64" ? "darwin-arm64" : "darwin-x64";
   const { version } = require("../package.json");
-  const url = `https://github.com/alexchen1337/port-cli/releases/download/v${version}/port-cli-${arch}.tar.gz`;
+  const url = `https://github.com/alexchen1337/port-cli/releases/download/v${version}/portui-${arch}.tar.gz`;
 
-  console.error(`Downloading port-cli ${version} for ${arch}…`);
+  console.error(`Downloading portui ${version} for ${arch}…`);
   await downloadRelease(url);
-  console.error("port-cli: installed");
+  console.error("portui: installed");
 }
 
 main().catch((err) => {

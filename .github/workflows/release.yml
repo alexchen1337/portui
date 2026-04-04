@@ -1,0 +1,40 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - "v*"
+
+permissions:
+  contents: write
+
+jobs:
+  build-macos:
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: macos-13
+            artifact: port-cli-darwin-x64
+          - os: macos-latest
+            artifact: port-cli-darwin-arm64
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: dtolnay/rust-toolchain@stable
+
+      - name: Build release binary
+        run: cargo build --release
+
+      - name: Package tarball
+        run: |
+          mkdir -p "dist/${{ matrix.artifact }}"
+          cp target/release/port-cli "dist/${{ matrix.artifact }}/port-cli"
+          chmod +x "dist/${{ matrix.artifact }}/port-cli"
+          cd dist && tar czvf "${{ matrix.artifact }}.tar.gz" "${{ matrix.artifact }}"
+
+      - name: Upload release asset
+        uses: softprops/action-gh-release@v2
+        with:
+          files: dist/${{ matrix.artifact }}.tar.gz

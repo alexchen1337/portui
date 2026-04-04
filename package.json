@@ -1,0 +1,33 @@
+{
+  "name": "port-cli",
+  "version": "0.1.0",
+  "description": "Interactive TUI for active listening ports and process management (macOS)",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/alexchen1337/port-cli.git"
+  },
+  "keywords": [
+    "cli",
+    "ports",
+    "lsof",
+    "tui",
+    "macos"
+  ],
+  "engines": {
+    "node": ">=18"
+  },
+  "bin": {
+    "port-cli": "./npm/run.js"
+  },
+  "scripts": {
+    "preinstall": "node npm/preinstall.js",
+    "postinstall": "node npm/install.js"
+  },
+  "files": [
+    "npm/**/*"
+  ],
+  "dependencies": {
+    "tar": "^7.5.13"
+  }
+}

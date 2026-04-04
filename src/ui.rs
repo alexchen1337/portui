@@ -308,7 +308,7 @@ fn render_kill_popup(f: &mut Frame<'_>, area: Rect, prompt: &crate::app::KillPro
                 .add_modifier(Modifier::BOLD),
         );
 
-    let text = format!("Send SIGTERM to PID {} ({})?\n\n[y] yes   [n] no   [Esc] cancel", pid, cmd);
+    let text = format!("Send SIGTERM to PID {} ({})?\n\n[y] yes    [n] no", pid, cmd);
 
     let popup_w = (text.lines().map(|l| l.len()).max().unwrap_or(40) + 4).min(area.width as usize) as u16;
     let popup_h = 7u16;

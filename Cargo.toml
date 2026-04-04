@@ -1,0 +1,12 @@
+[package]
+name = "port-cli"
+version = "0.1.0"
+edition = "2021"
+description = "Interactive TUI for active listening ports and process management"
+license = "MIT"
+
+[dependencies]
+anyhow = "1.0"
+crossterm = "0.28"
+nix = { version = "0.29", features = ["signal"] }
+ratatui = "0.29"

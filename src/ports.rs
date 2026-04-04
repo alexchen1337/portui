@@ -128,6 +128,57 @@ fn normalize_address(host: &str) -> String {
     }
 }
 
+#[derive(Debug, Clone)]
+pub struct ProcessDetails {
+    pub parent_pid: Option<u32>,
+    pub open_files: Option<usize>,
+    pub established_conns: Option<usize>,
+}
+
+pub fn get_process_details(pid: u32, port: u16) -> ProcessDetails {
+    ProcessDetails {
+        parent_pid: get_parent_pid(pid),
+        open_files: get_open_file_count(pid),
+        established_conns: get_established_connections(port),
+    }
+}
+
+fn get_parent_pid(pid: u32) -> Option<u32> {
+    let output = Command::new("ps")
+        .args(["-p", &pid.to_string(), "-o", "ppid="])
+        .output()
+        .ok()?;
+    String::from_utf8_lossy(&output.stdout).trim().parse().ok()
+}
+
+fn get_open_file_count(pid: u32) -> Option<usize> {
+    let output = Command::new("lsof")
+        .args(["-p", &pid.to_string()])
+        .output()
+        .ok()?;
+    Some(
+        String::from_utf8_lossy(&output.stdout)
+            .lines()
+            .count()
+            .saturating_sub(1),
+    )
+}
+
+fn get_established_connections(port: u16) -> Option<usize> {
+    let port_str = format!(":{}", port);
+    let output = Command::new("lsof")
+        .args(["-iTCP", "-sTCP:ESTABLISHED", "-nP"])
+        .output()
+        .ok()?;
+    Some(
+        String::from_utf8_lossy(&output.stdout)
+            .lines()
+            .skip(1)
+            .filter(|line| line.contains(&port_str))
+            .count(),
+    )
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

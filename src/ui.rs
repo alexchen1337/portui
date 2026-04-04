@@ -26,18 +26,23 @@ pub fn draw(
 ) {
     let area = f.area();
 
+    let footer_h = if app.filter_editing { 3 } else { 2 };
+    let details_h: u16 = if app.show_details { 6 } else { 0 };
+
     let main_chunks = Layout::default()
         .direction(Direction::Vertical)
         .constraints([
             Constraint::Length(3),
             Constraint::Min(5),
-            Constraint::Length(if app.filter_editing { 3 } else { 2 }),
+            Constraint::Length(details_h),
+            Constraint::Length(footer_h),
         ])
         .split(area);
 
     let header_area = main_chunks[0];
     let table_block_area = main_chunks[1];
-    let footer_area = main_chunks[2];
+    let details_area = main_chunks[2];
+    let footer_area = main_chunks[3];
 
     render_header(f, app, header_area);
     render_table(
@@ -46,6 +51,10 @@ pub fn draw(
         table_state,
         table_area_override.unwrap_or(table_block_area),
     );
+
+    if app.show_details {
+        render_details(f, app, details_area);
+    }
 
     if app.filter_editing {
         let filter_chunks = Layout::default()
@@ -78,11 +87,19 @@ fn render_header(f: &mut Frame<'_>, app: &App, area: Rect) {
         ),
         Span::styled(
             if app.last_error.is_some() {
-                "  ! scan error  "
+                "  ! scan error  ".to_string()
+            } else if app.auto_refresh {
+                "  refresh: 2s  ".to_string()
             } else {
-                "  refresh: 2s  "
+                "  refresh: off  ".to_string()
             },
-            Style::default().fg(Color::Rgb(243, 139, 168)).bg(HEADER_BG),
+            Style::default()
+                .fg(if app.auto_refresh && app.last_error.is_none() {
+                    Color::Rgb(166, 227, 161)
+                } else {
+                    Color::Rgb(243, 139, 168)
+                })
+                .bg(HEADER_BG),
         ),
         Span::styled("  [?] help ", Style::default().fg(FOOTER_FG).bg(HEADER_BG)),
     ]);
@@ -115,6 +132,7 @@ fn port_style(entry: &PortEntry, selected: bool) -> Style {
 
 fn render_table(f: &mut Frame<'_>, app: &App, table_state: &mut TableState, area: Rect) {
     let visible: Vec<&PortEntry> = app.visible_ports();
+    let conflicts = app.conflicting_ports();
     if visible.is_empty() {
         table_state.select(None);
     } else {
@@ -134,6 +152,7 @@ fn render_table(f: &mut Frame<'_>, app: &App, table_state: &mut TableState, area
         .enumerate()
         .map(|(i, e)| {
             let selected = i == app.selected;
+            let is_conflict = conflicts.contains(&e.port);
             let st = port_style(e, selected);
             let pid = Style::default()
                 .fg(if selected {
@@ -161,10 +180,21 @@ fn render_table(f: &mut Frame<'_>, app: &App, table_state: &mut TableState, area
                 })
                 .add_modifier(Modifier::BOLD);
 
+            let conflict_st = Style::default()
+                .fg(Color::Rgb(250, 179, 135))
+                .bg(if selected { ROW_SELECTED_BG } else { Color::Reset })
+                .add_modifier(Modifier::BOLD);
+
+            let port_text = if is_conflict {
+                format!("{} !", e.port)
+            } else {
+                format!("{}", e.port)
+            };
+
             Row::new(vec![
                 ratatui::widgets::Cell::from(format!("{}", e.pid)).style(pid),
                 ratatui::widgets::Cell::from(e.command.as_str()).style(name_st),
-                ratatui::widgets::Cell::from(format!("{}", e.port)).style(st),
+                ratatui::widgets::Cell::from(port_text).style(if is_conflict { conflict_st } else { st }),
                 ratatui::widgets::Cell::from(e.address.as_str()).style(st),
                 ratatui::widgets::Cell::from(e.user.as_str()).style(st),
                 ratatui::widgets::Cell::from(e.ip_version.as_str()).style(st),
@@ -263,13 +293,13 @@ fn render_footer(f: &mut Frame<'_>, _app: &App, area: Rect, filter_mode: bool) {
         spans.extend(key_span("Esc", "exit filter"));
     } else {
         spans.extend(key_span("q", "quit"));
-        spans.extend(key_span("j/↓", "down"));
-        spans.extend(key_span("k/↑", "up"));
+        spans.extend(key_span("j/k", "nav"));
         spans.extend(key_span("K/⏎", "kill"));
+        spans.extend(key_span("d", "details"));
+        spans.extend(key_span("w", "watch"));
         spans.extend(key_span("r", "refresh"));
         spans.extend(key_span("s", "sort"));
         spans.extend(key_span("/", "filter"));
-        spans.extend(key_span("g/G", "top/end"));
     }
 
     let line = Line::from(spans);
@@ -292,6 +322,105 @@ fn render_filter_line(f: &mut Frame<'_>, app: &App, area: Rect) {
     f.render_widget(p, area);
 }
 
+fn render_details(f: &mut Frame<'_>, app: &App, area: Rect) {
+    let block = Block::default()
+        .borders(Borders::ALL)
+        .border_style(Style::default().fg(Color::Rgb(69, 71, 90)))
+        .title(Line::from(vec![
+            Span::styled(
+                " Details ",
+                Style::default()
+                    .fg(Color::Rgb(137, 180, 250))
+                    .add_modifier(Modifier::BOLD),
+            ),
+        ]));
+
+    let inner = block.inner(area);
+    f.render_widget(block, area);
+
+    let entry = match app.selected_entry() {
+        Some(e) => e,
+        None => {
+            let msg = Paragraph::new("No selection")
+                .style(Style::default().fg(FOOTER_FG))
+                .alignment(Alignment::Center);
+            f.render_widget(msg, inner);
+            return;
+        }
+    };
+
+    let conflicts = app.conflicting_ports();
+    let is_conflict = conflicts.contains(&entry.port);
+
+    let category = match entry.port_category() {
+        PortCategory::WellKnown => "well-known (0-1023)",
+        PortCategory::Registered => "registered (1024-49151)",
+        PortCategory::Dynamic => "dynamic (49152-65535)",
+    };
+
+    let mut detail_spans: Vec<Span> = vec![
+        Span::styled("  Port: ", Style::default().fg(FOOTER_FG)),
+        Span::styled(
+            format!("{} ", entry.port),
+            Style::default()
+                .fg(Color::Rgb(205, 214, 244))
+                .add_modifier(Modifier::BOLD),
+        ),
+        Span::styled(
+            format!("({})  ", category),
+            Style::default().fg(Color::Rgb(166, 218, 239)),
+        ),
+    ];
+
+    if is_conflict {
+        detail_spans.push(Span::styled(
+            "CONFLICT: multiple PIDs on this port  ",
+            Style::default()
+                .fg(Color::Rgb(250, 179, 135))
+                .add_modifier(Modifier::BOLD),
+        ));
+    }
+
+    let mut extra_line_parts: Vec<Span> = Vec::new();
+    if let Some((cached_pid, ref details)) = app.details_cache {
+        if cached_pid == entry.pid {
+            if let Some(ppid) = details.parent_pid {
+                extra_line_parts.push(Span::styled("  Parent PID: ", Style::default().fg(FOOTER_FG)));
+                extra_line_parts.push(Span::styled(
+                    format!("{}  ", ppid),
+                    Style::default().fg(Color::Rgb(205, 214, 244)),
+                ));
+            }
+            if let Some(fds) = details.open_files {
+                extra_line_parts.push(Span::styled("Open FDs: ", Style::default().fg(FOOTER_FG)));
+                extra_line_parts.push(Span::styled(
+                    format!("{}  ", fds),
+                    Style::default().fg(Color::Rgb(205, 214, 244)),
+                ));
+            }
+            if let Some(conns) = details.established_conns {
+                extra_line_parts.push(Span::styled("Established: ", Style::default().fg(FOOTER_FG)));
+                extra_line_parts.push(Span::styled(
+                    format!("{}", conns),
+                    Style::default().fg(if conns > 0 {
+                        Color::Rgb(166, 227, 161)
+                    } else {
+                        Color::Rgb(205, 214, 244)
+                    }),
+                ));
+            }
+        }
+    }
+
+    let lines = vec![
+        Line::from(detail_spans),
+        Line::from(extra_line_parts),
+    ];
+
+    let p = Paragraph::new(lines).wrap(Wrap { trim: true });
+    f.render_widget(p, inner);
+}
+
 fn render_kill_popup(f: &mut Frame<'_>, area: Rect, prompt: &crate::app::KillPrompt) {
     let (pid, cmd) = match prompt {
         crate::app::KillPrompt::Pending { pid, command } => (*pid, command.as_str()),
@@ -307,7 +436,10 @@ fn render_kill_popup(f: &mut Frame<'_>, area: Rect, prompt: &crate::app::KillPro
                 .add_modifier(Modifier::BOLD),
         );
 
-    let text = format!("Send SIGTERM to PID {} ({})?\n\n[y] yes    [n] no", pid, cmd);
+    let text = format!(
+        "Kill PID {} ({})?\n\n[y] SIGTERM    [f] SIGKILL (force)    [n] cancel",
+        pid, cmd
+    );
 
     let popup_w = (text.lines().map(|l| l.len()).max().unwrap_or(40) + 4).min(area.width as usize) as u16;
     let popup_h = 7u16;
@@ -339,13 +471,18 @@ pub fn draw_help(f: &mut Frame<'_>, show: bool) {
         "q / Esc     Quit\n",
         "j / ↓       Move down\n",
         "k / ↑       Move up\n",
-        "Enter / K   Kill selected (SIGTERM)\n",
-        "r           Refresh list\n",
+        "Enter / K   Kill selected process\n",
+        "              y = SIGTERM  f = SIGKILL\n",
+        "d / Tab     Toggle details pane\n",
+        "w           Toggle auto-refresh (2s)\n",
+        "r           Manual refresh\n",
         "s           Cycle sort: port → pid → name\n",
         "/           Filter by name, user, port, pid\n",
         "g / Home    Jump to top\n",
         "G / End     Jump to bottom\n",
-        "?           Toggle this help\n",
+        "?           Toggle this help\n\n",
+        "Port conflict: ! marks ports with\n",
+        "multiple processes listening\n",
     );
     let block = Block::default()
         .borders(Borders::ALL)
@@ -353,7 +490,7 @@ pub fn draw_help(f: &mut Frame<'_>, show: bool) {
         .border_style(Style::default().fg(Color::Rgb(137, 180, 250)));
 
     let w = 50.min(area.width);
-    let h = 18.min(area.height);
+    let h = 24.min(area.height);
     let popup_area = Rect {
         x: area.x + (area.width.saturating_sub(w)) / 2,
         y: area.y + (area.height.saturating_sub(h)) / 2,

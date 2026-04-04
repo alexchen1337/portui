@@ -1,6 +1,7 @@
 //! Application state: selection, sort, filter, kill confirmation.
 
-use crate::ports::{PortEntry, scan_ports};
+use crate::ports::{PortEntry, ProcessDetails, get_process_details, scan_ports};
+use std::collections::{HashMap, HashSet};
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum SortMode {
@@ -45,6 +46,12 @@ pub struct App {
     pub kill_prompt: Option<KillPrompt>,
     /// Ticks since start; used for auto-refresh (4 ticks × 250ms = 1s, plan said 2s → 8 ticks).
     pub tick: u64,
+    /// Whether auto-refresh is enabled.
+    pub auto_refresh: bool,
+    /// Whether the details pane is shown.
+    pub show_details: bool,
+    /// Cached process details (pid, details).
+    pub details_cache: Option<(u32, ProcessDetails)>,
 }
 
 const REFRESH_TICKS: u64 = 8; // 8 × 250ms = 2s
@@ -60,6 +67,9 @@ impl App {
             selected: 0,
             kill_prompt: None,
             tick: 0,
+            auto_refresh: true,
+            show_details: false,
+            details_cache: None,
         }
     }
 
@@ -79,7 +89,49 @@ impl App {
 
     /// Returns true if periodic refresh should run this tick.
     pub fn should_auto_refresh(&self) -> bool {
-        self.tick > 0 && self.tick.is_multiple_of(REFRESH_TICKS)
+        self.auto_refresh && self.tick > 0 && self.tick.is_multiple_of(REFRESH_TICKS)
+    }
+
+    pub fn toggle_auto_refresh(&mut self) {
+        self.auto_refresh = !self.auto_refresh;
+    }
+
+    pub fn toggle_details(&mut self) {
+        self.show_details = !self.show_details;
+        if self.show_details {
+            self.update_details_cache();
+        } else {
+            self.details_cache = None;
+        }
+    }
+
+    pub fn update_details_cache(&mut self) {
+        if !self.show_details {
+            return;
+        }
+        if let Some(entry) = self.selected_entry() {
+            let pid = entry.pid;
+            let port = entry.port;
+            if self.details_cache.as_ref().map_or(true, |(cached_pid, _)| *cached_pid != pid) {
+                let details = get_process_details(pid, port);
+                self.details_cache = Some((pid, details));
+            }
+        } else {
+            self.details_cache = None;
+        }
+    }
+
+    /// Returns ports that have multiple different PIDs listening.
+    pub fn conflicting_ports(&self) -> HashSet<u16> {
+        let mut port_pids: HashMap<u16, HashSet<u32>> = HashMap::new();
+        for entry in &self.ports {
+            port_pids.entry(entry.port).or_default().insert(entry.pid);
+        }
+        port_pids
+            .into_iter()
+            .filter(|(_, pids)| pids.len() > 1)
+            .map(|(port, _)| port)
+            .collect()
     }
 
     pub fn advance_tick(&mut self) {
@@ -153,6 +205,7 @@ impl App {
 
     pub fn move_up(&mut self) {
         self.selected = self.selected.saturating_sub(1);
+        self.update_details_cache();
     }
 
     pub fn move_down(&mut self) {
@@ -160,10 +213,12 @@ impl App {
         if n > 0 {
             self.selected = (self.selected + 1).min(n - 1);
         }
+        self.update_details_cache();
     }
 
     pub fn jump_top(&mut self) {
         self.selected = 0;
+        self.update_details_cache();
     }
 
     pub fn jump_bottom(&mut self) {
@@ -171,6 +226,7 @@ impl App {
         if n > 0 {
             self.selected = n - 1;
         }
+        self.update_details_cache();
     }
 
     pub fn selected_entry(&self) -> Option<&PortEntry> {

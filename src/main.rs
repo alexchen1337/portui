@@ -69,6 +69,12 @@ fn run() -> Result<()> {
                                 app.refresh_ports();
                             }
                         }
+                        KeyCode::Char('f') | KeyCode::Char('F') => {
+                            if let Some(pid) = app.confirm_kill() {
+                                let _ = signal::kill(Pid::from_raw(pid as i32), Signal::SIGKILL);
+                                app.refresh_ports();
+                            }
+                        }
                         KeyCode::Char('n') | KeyCode::Char('N') | KeyCode::Esc => {
                             app.dismiss_kill_prompt();
                         }
@@ -112,6 +118,8 @@ fn run() -> Result<()> {
                     KeyCode::Char('/') => {
                         app.filter_editing = true;
                     }
+                    KeyCode::Char('d') | KeyCode::Tab => app.toggle_details(),
+                    KeyCode::Char('w') => app.toggle_auto_refresh(),
                     KeyCode::Enter | KeyCode::Char('K') => app.open_kill_prompt(),
                     _ => {}
                 }

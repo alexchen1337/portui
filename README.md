@@ -1,6 +1,6 @@
 # portui
 
-Interactive terminal UI for **listening TCP ports** on macOS (via `lsof`). Browse PIDs, processes, addresses, and users; filter and sort; send **SIGTERM** to a selected process.
+Interactive terminal UI for **listening TCP ports** on macOS (via `lsof`). Browse PIDs, processes, addresses, and users; filter and sort; kill processes with SIGTERM or SIGKILL; inspect process details; detect port conflicts.
 
 ## Requirements
 
@@ -40,16 +40,25 @@ npm install
 ## Keys
 
 
-| Key                       | Action                               |
-| ------------------------- | ------------------------------------ |
-| `q` / `Esc`               | Quit                                 |
-| `j` / `↓`, `k` / `↑`      | Move selection                       |
-| `Enter` / `K`             | Kill selected (confirm with `y`/`n`) |
-| `r`                       | Refresh                              |
-| `s`                       | Cycle sort: port → pid → name        |
-| `/`                       | Filter (name, user, port, PID)       |
-| `g` / `Home`, `G` / `End` | Jump top / bottom                    |
-| `?`                       | Help overlay                         |
+| Key                       | Action                                          |
+| ------------------------- | ----------------------------------------------- |
+| `q` / `Esc`               | Quit                                            |
+| `j` / `↓`, `k` / `↑`      | Move selection                                  |
+| `Enter` / `K`             | Kill selected (`y` SIGTERM, `f` SIGKILL, `n` cancel) |
+| `d` / `Tab`               | Toggle details pane (parent PID, FDs, conns)    |
+| `w`                       | Toggle auto-refresh (2s interval)               |
+| `r`                       | Manual refresh                                  |
+| `s`                       | Cycle sort: port → pid → name                   |
+| `/`                       | Filter (name, user, port, PID)                  |
+| `g` / `Home`, `G` / `End` | Jump top / bottom                               |
+| `?`                       | Help overlay                                    |
+
+## Features
+
+- **Details pane** (`d`/`Tab`) — shows port category, parent PID, open file descriptor count, and established connection count for the selected process
+- **SIGTERM + SIGKILL** — kill prompt offers graceful termination (`y`) or force kill (`f`)
+- **Auto-refresh** (`w`) — polls every 2 seconds by default; toggle on/off with `w`
+- **Port conflict detection** — ports with multiple processes listening are marked with `!` in the table
 
 
 ## Build

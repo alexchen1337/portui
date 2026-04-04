@@ -14,23 +14,25 @@ jobs:
       fail-fast: false
       matrix:
         include:
-          - os: macos-13
+          - target: x86_64-apple-darwin
             artifact: portui-darwin-x64
-          - os: macos-latest
+          - target: aarch64-apple-darwin
             artifact: portui-darwin-arm64
-    runs-on: ${{ matrix.os }}
+    runs-on: macos-latest
     steps:
       - uses: actions/checkout@v4
 
       - uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: ${{ matrix.target }}
 
       - name: Build release binary
-        run: cargo build --release
+        run: cargo build --release --target ${{ matrix.target }}
 
       - name: Package tarball
         run: |
           mkdir -p "dist/${{ matrix.artifact }}"
-          cp target/release/portui "dist/${{ matrix.artifact }}/portui"
+          cp target/${{ matrix.target }}/release/portui "dist/${{ matrix.artifact }}/portui"
           chmod +x "dist/${{ matrix.artifact }}/portui"
           cd dist && tar czvf "${{ matrix.artifact }}.tar.gz" "${{ matrix.artifact }}"
 

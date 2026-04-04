@@ -1,6 +1,6 @@
 {
   "name": "portui",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "description": "Interactive TUI for active listening ports and process management (macOS)",
   "license": "MIT",
   "repository": {

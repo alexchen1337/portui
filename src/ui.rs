@@ -278,18 +278,17 @@ fn render_footer(f: &mut Frame<'_>, _app: &App, area: Rect, filter_mode: bool) {
 }
 
 fn render_filter_line(f: &mut Frame<'_>, app: &App, area: Rect) {
+    // Must stay single-line: any Block borders need extra rows; with Length(1) the inner
+    // area was empty and the typed filter drew past the bottom of the terminal.
     let text = format!(" /{}", app.filter);
     let p = Paragraph::new(Line::from(vec![Span::styled(
         text,
         Style::default()
             .fg(Color::Rgb(205, 214, 244))
+            .bg(Color::Rgb(24, 24, 37))
             .add_modifier(Modifier::BOLD),
     )]))
-    .block(
-        Block::default()
-            .borders(Borders::ALL)
-            .border_style(Style::default().fg(Color::Rgb(137, 180, 250))),
-    );
+    .style(Style::default().bg(Color::Rgb(24, 24, 37)));
     f.render_widget(p, area);
 }
 
@@ -336,7 +335,7 @@ pub fn draw_help(f: &mut Frame<'_>, show: bool) {
     }
     let area = f.area();
     let text = concat!(
-        "port-cli — listening TCP ports\n\n",
+        "portui — listening TCP ports\n\n",
         "q / Esc     Quit\n",
         "j / ↓       Move down\n",
         "k / ↑       Move up\n",

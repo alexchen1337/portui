@@ -1,11 +1,11 @@
 {
-  "name": "port-cli",
+  "name": "portui",
   "version": "0.1.0",
   "description": "Interactive TUI for active listening ports and process management (macOS)",
   "license": "MIT",
   "repository": {
     "type": "git",
-    "url": "https://github.com/alexchen1337/port-cli.git"
+    "url": "git+https://github.com/alexchen1337/port-cli.git"
   },
   "keywords": [
     "cli",
@@ -18,14 +18,14 @@
     "node": ">=18"
   },
   "bin": {
-    "port-cli": "./npm/run.js"
+    "portui": "scripts/run.js"
   },
   "scripts": {
-    "preinstall": "node npm/preinstall.js",
-    "postinstall": "node npm/install.js"
+    "preinstall": "node scripts/preinstall.js",
+    "postinstall": "node scripts/install.js"
   },
   "files": [
-    "npm/**/*"
+    "scripts/**/*"
   ],
   "dependencies": {
     "tar": "^7.5.13"

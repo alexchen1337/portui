@@ -1,4 +1,4 @@
-//! port-cli — TUI for listening TCP ports (lsof) with kill (SIGTERM).
+//! portui — TUI for listening TCP ports (lsof) with kill (SIGTERM).
 
 mod app;
 mod ports;

@@ -5,12 +5,12 @@ const { spawnSync } = require("child_process");
 const { existsSync } = require("fs");
 const { join } = require("path");
 
-const bin = join(__dirname, "..", "bin", "port-cli");
+const bin = join(__dirname, "..", "bin", "portui");
 
 if (!existsSync(bin)) {
   console.error(
-    "port-cli binary not found. On macOS, reinstall the package so postinstall can download it, " +
-      "or build from source: cargo build --release && cp target/release/port-cli bin/port-cli"
+    "portui binary not found. On macOS, reinstall the package so postinstall can download it, " +
+      "or build from source: cargo build --release && cp target/release/portui bin/portui"
   );
   process.exit(1);
 }

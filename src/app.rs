@@ -1,6 +1,6 @@
 //! Application state: selection, sort, filter, kill confirmation.
 
-use crate::ports::{PortEntry, ProcessDetails, get_process_details, scan_ports};
+use crate::ports::{PortEntry, ProcessDetails, SystemStats, get_process_details, scan_ports, system_stats, total_memory_gib};
 use std::collections::{HashMap, HashSet};
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -52,6 +52,10 @@ pub struct App {
     pub show_details: bool,
     /// Cached process details (pid, details).
     pub details_cache: Option<(u32, ProcessDetails)>,
+    /// Total system memory in GiB (fetched once at startup).
+    pub total_mem_gib: f64,
+    /// Current system-wide resource usage.
+    pub sys_stats: SystemStats,
 }
 
 const REFRESH_TICKS: u64 = 8; // 8 × 250ms = 2s
@@ -70,6 +74,8 @@ impl App {
             auto_refresh: true,
             show_details: false,
             details_cache: None,
+            total_mem_gib: total_memory_gib(),
+            sys_stats: SystemStats { cpu_pct: 0.0, mem_used_gib: 0.0, mem_total_gib: 0.0 },
         }
     }
 
@@ -85,6 +91,7 @@ impl App {
                 self.last_error = Some(e.to_string());
             }
         }
+        self.sys_stats = system_stats(self.total_mem_gib);
     }
 
     /// Returns true if periodic refresh should run this tick.

@@ -72,7 +72,24 @@ pub fn draw(
     }
 }
 
+fn usage_color(pct: f32) -> Color {
+    if pct >= 80.0 {
+        Color::Rgb(243, 139, 168) // red
+    } else if pct >= 50.0 {
+        Color::Rgb(249, 226, 175) // yellow
+    } else {
+        Color::Rgb(166, 227, 161) // green
+    }
+}
+
 fn render_header(f: &mut Frame<'_>, app: &App, area: Rect) {
+    let ss = &app.sys_stats;
+    let mem_pct = if ss.mem_total_gib > 0.0 {
+        (ss.mem_used_gib / ss.mem_total_gib * 100.0) as f32
+    } else {
+        0.0
+    };
+
     let title = Line::from(vec![
         Span::styled(
             " PORT CLI ",
@@ -81,17 +98,28 @@ fn render_header(f: &mut Frame<'_>, app: &App, area: Rect) {
                 .bg(HEADER_BG)
                 .add_modifier(Modifier::BOLD),
         ),
+        Span::styled("  CPU: ", Style::default().fg(FOOTER_FG).bg(HEADER_BG)),
         Span::styled(
-            format!("  sort:{}  ", app.sort_mode.label()),
+            format!("{:.0}%", ss.cpu_pct),
+            Style::default().fg(usage_color(ss.cpu_pct)).bg(HEADER_BG).add_modifier(Modifier::BOLD),
+        ),
+        Span::styled("  MEM: ", Style::default().fg(FOOTER_FG).bg(HEADER_BG)),
+        Span::styled(
+            format!("{:.1}/{:.0} GB", ss.mem_used_gib, ss.mem_total_gib),
+            Style::default().fg(usage_color(mem_pct)).bg(HEADER_BG).add_modifier(Modifier::BOLD),
+        ),
+        Span::styled("  ", Style::default().bg(HEADER_BG)),
+        Span::styled(
+            format!("sort:{}  ", app.sort_mode.label()),
             Style::default().fg(Color::Rgb(166, 218, 239)).bg(HEADER_BG),
         ),
         Span::styled(
             if app.last_error.is_some() {
-                "  ! scan error  ".to_string()
+                "! scan error  ".to_string()
             } else if app.auto_refresh {
-                "  refresh: 2s  ".to_string()
+                "refresh: 2s  ".to_string()
             } else {
-                "  refresh: off  ".to_string()
+                "refresh: off  ".to_string()
             },
             Style::default()
                 .fg(if app.auto_refresh && app.last_error.is_none() {
@@ -101,7 +129,7 @@ fn render_header(f: &mut Frame<'_>, app: &App, area: Rect) {
                 })
                 .bg(HEADER_BG),
         ),
-        Span::styled("  [?] help ", Style::default().fg(FOOTER_FG).bg(HEADER_BG)),
+        Span::styled("[?] help ", Style::default().fg(FOOTER_FG).bg(HEADER_BG)),
     ]);
 
     let block = Block::default()
@@ -143,7 +171,7 @@ fn render_table(f: &mut Frame<'_>, app: &App, table_state: &mut TableState, area
         .bg(HEADER_BG)
         .add_modifier(Modifier::BOLD);
 
-    let header = Row::new(vec!["PID", "Process", "Port", "Address", "User", "Proto"])
+    let header = Row::new(vec!["PID", "Process", "Port", "CPU%", "MEM", "Address", "User", "Proto"])
         .style(header_style)
         .height(1);
 
@@ -191,10 +219,29 @@ fn render_table(f: &mut Frame<'_>, app: &App, table_state: &mut TableState, area
                 format!("{}", e.port)
             };
 
+            let cpu_text = format!("{:.1}", e.cpu_pct);
+            let mem_gib = e.mem_mib / 1024.0;
+            let mem_text = format!("{:.1} GB", mem_gib);
+
+            let resource_st = Style::default()
+                .fg(if selected {
+                    ROW_SELECTED_FG
+                } else if e.cpu_pct >= 50.0 || mem_gib >= 0.5 {
+                    Color::Rgb(243, 139, 168) // red for high usage
+                } else if e.cpu_pct >= 10.0 || mem_gib >= 0.125 {
+                    Color::Rgb(249, 226, 175) // yellow for moderate
+                } else {
+                    Color::Rgb(205, 214, 244) // normal
+                })
+                .bg(if selected { ROW_SELECTED_BG } else { Color::Reset })
+                .add_modifier(if selected { Modifier::BOLD } else { Modifier::empty() });
+
             Row::new(vec![
                 ratatui::widgets::Cell::from(format!("{}", e.pid)).style(pid),
                 ratatui::widgets::Cell::from(e.command.as_str()).style(name_st),
                 ratatui::widgets::Cell::from(port_text).style(if is_conflict { conflict_st } else { st }),
+                ratatui::widgets::Cell::from(cpu_text).style(resource_st),
+                ratatui::widgets::Cell::from(mem_text).style(resource_st),
                 ratatui::widgets::Cell::from(e.address.as_str()).style(st),
                 ratatui::widgets::Cell::from(e.user.as_str()).style(st),
                 ratatui::widgets::Cell::from(e.ip_version.as_str()).style(st),
@@ -204,7 +251,9 @@ fn render_table(f: &mut Frame<'_>, app: &App, table_state: &mut TableState, area
 
     let widths = [
         Constraint::Length(8),
-        Constraint::Min(12),
+        Constraint::Min(10),
+        Constraint::Length(7),
+        Constraint::Length(6),
         Constraint::Length(7),
         Constraint::Length(18),
         Constraint::Length(12),
